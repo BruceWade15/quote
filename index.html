@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quote Finder for Speakers</title>
+    <title>Bruce's Quote Finder for Speakers</title>
     <style>
         * {
             margin: 0;
@@ -41,6 +41,14 @@
             font-size: 2.5rem;
             margin-bottom: 10px;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .logo {
+            width: 120px;
+            height: auto;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
         }
 
         .header p {
@@ -297,7 +305,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🎤 Quote Finder for Speakers</h1>
+            <img src="https://brucewade.co.za/wp-content/uploads/2023/08/Logo100.png" alt="Bruce Wade Logo" class="logo">
+            <h1>🎤 Bruce's Quote Finder for Speakers</h1>
             <p>Discover the perfect quotes to enhance your keynote presentations</p>
         </div>
 
@@ -461,14 +470,250 @@
             }
 
             async performQuoteSearch(searchQuery, criteria) {
-                // Note: In a real implementation, this would call Claude's API or a quote database
-                // For this demo, we'll return curated quotes based on the criteria
+                try {
+                    // Build multiple search queries for better results
+                    const searchQueries = this.buildSearchQueries(criteria);
+                    const allQuotes = [];
+                    
+                    // Perform multiple searches
+                    for (const query of searchQueries) {
+                        try {
+                            const quotes = await this.searchWeb(query, criteria);
+                            allQuotes.push(...quotes);
+                        } catch (error) {
+                            console.warn(`Search failed for query: ${query}`, error);
+                        }
+                    }
+                    
+                    // Remove duplicates and filter by criteria
+                    const uniqueQuotes = this.filterAndDeduplicateQuotes(allQuotes, criteria);
+                    
+                    // If no results from web search, fall back to curated quotes
+                    if (uniqueQuotes.length === 0) {
+                        console.log('No web results found, using curated quotes');
+                        return this.generateMockQuotes(criteria);
+                    }
+                    
+                    return uniqueQuotes.slice(0, 5); // Return top 5 results
+                } catch (error) {
+                    console.error('Search error:', error);
+                    // Fallback to curated quotes
+                    return this.generateMockQuotes(criteria);
+                }
+            }
+
+            buildSearchQueries(criteria) {
+                const queries = [];
+                const theme = criteria.quoteTheme.toLowerCase();
+                const type = criteria.quoteType;
+                const location = criteria.location;
                 
-                return new Promise((resolve) => {
-                    setTimeout(() => {
-                        const mockQuotes = this.generateMockQuotes(criteria);
-                        resolve(mockQuotes);
-                    }, 2000); // Simulate API delay
+                // Primary search queries
+                queries.push(`${theme} quotes ${type}`);
+                queries.push(`famous ${theme} sayings`);
+                queries.push(`${theme} inspirational quotes`);
+                
+                // Add keynote-specific searches
+                if (criteria.keynoteTitle) {
+                    const keynoteWords = criteria.keynoteTitle.toLowerCase().split(' ').filter(word => word.length > 3);
+                    keynoteWords.forEach(word => {
+                        queries.push(`${word} ${theme} quotes`);
+                    });
+                }
+                
+                // Location-specific searches
+                if (location) {
+                    queries.push(`${theme} quotes ${location}`);
+                    queries.push(`${location} ${theme} proverbs`);
+                }
+                
+                // Type-specific searches
+                switch (type) {
+                    case 'humorous':
+                        queries.push(`funny ${theme} quotes`);
+                        queries.push(`witty ${theme} sayings`);
+                        break;
+                    case 'serious':
+                        queries.push(`profound ${theme} quotes`);
+                        queries.push(`deep ${theme} wisdom`);
+                        break;
+                    case 'business':
+                        queries.push(`professional ${theme} quotes`);
+                        queries.push(`corporate ${theme} sayings`);
+                        break;
+                    case 'casual':
+                        queries.push(`everyday ${theme} quotes`);
+                        queries.push(`simple ${theme} wisdom`);
+                        break;
+                }
+                
+                return queries.slice(0, 5); // Limit to 5 searches to avoid rate limits
+            }
+
+            async searchWeb(query, criteria) {
+                // Use a web search API (multiple options available)
+                const searchEngines = [
+                    () => this.searchWithDuckDuckGo(query),
+                    () => this.searchWithQuoteGarden(query, criteria),
+                    () => this.searchWithBrainyQuote(query, criteria)
+                ];
+                
+                for (const searchFunction of searchEngines) {
+                    try {
+                        const results = await searchFunction();
+                        if (results && results.length > 0) {
+                            return results;
+                        }
+                    } catch (error) {
+                        console.warn('Search engine failed:', error);
+                        continue;
+                    }
+                }
+                
+                return [];
+            }
+
+            async searchWithDuckDuckGo(query) {
+                try {
+                    // Using DuckDuckGo Instant Answer API (free, no API key required)
+                    const searchUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query + ' quotes')}&format=json&no_html=1&skip_disambig=1`;
+                    
+                    const response = await fetch(searchUrl);
+                    const data = await response.json();
+                    
+                    const quotes = [];
+                    
+                    // Parse DuckDuckGo results
+                    if (data.AbstractText) {
+                        const extractedQuotes = this.extractQuotesFromText(data.AbstractText);
+                        quotes.push(...extractedQuotes);
+                    }
+                    
+                    if (data.RelatedTopics) {
+                        data.RelatedTopics.forEach(topic => {
+                            if (topic.Text) {
+                                const extractedQuotes = this.extractQuotesFromText(topic.Text);
+                                quotes.push(...extractedQuotes);
+                            }
+                        });
+                    }
+                    
+                    return quotes;
+                } catch (error) {
+                    console.error('DuckDuckGo search failed:', error);
+                    return [];
+                }
+            }
+
+            async searchWithQuoteGarden(query, criteria) {
+                try {
+                    // Using QuoteGarden API (free quotes API)
+                    const apiUrl = `https://quotegarden.herokuapp.com/api/v3/quotes?author=${encodeURIComponent(query)}&limit=10`;
+                    
+                    const response = await fetch(apiUrl);
+                    const data = await response.json();
+                    
+                    if (data.statusCode === 200 && data.data) {
+                        return data.data.map(item => ({
+                            text: item.quoteText.replace(/["""]/g, ''),
+                            author: item.quoteAuthor,
+                            source: item.quoteGenre || 'QuoteGarden',
+                            wordCount: item.quoteText.split(' ').length
+                        }));
+                    }
+                    
+                    return [];
+                } catch (error) {
+                    console.error('QuoteGarden search failed:', error);
+                    return [];
+                }
+            }
+
+            async searchWithBrainyQuote(query, criteria) {
+                // Note: This would require CORS proxy or backend implementation
+                // For now, returning empty array but structure is ready
+                return [];
+            }
+
+            extractQuotesFromText(text) {
+                const quotes = [];
+                
+                // Pattern to match quotes with attribution
+                const quotePatterns = [
+                    /"([^"]+)"\s*[-–—]\s*([^,\n]+)/g,
+                    /"([^"]+)"\s*by\s+([^,\n]+)/g,
+                    /'([^']+)'\s*[-–—]\s*([^,\n]+)/g,
+                    /([^.!?]+[.!?])\s*[-–—]\s*([^,\n]+)/g
+                ];
+                
+                quotePatterns.forEach(pattern => {
+                    let match;
+                    while ((match = pattern.exec(text)) !== null) {
+                        const quoteText = match[1].trim();
+                        const author = match[2].trim();
+                        
+                        if (quoteText.length > 10 && quoteText.length < 200 && author.length < 50) {
+                            quotes.push({
+                                text: quoteText,
+                                author: author,
+                                source: 'Web Search',
+                                wordCount: quoteText.split(' ').length
+                            });
+                        }
+                    }
+                });
+                
+                return quotes;
+            }
+
+            filterAndDeduplicateQuotes(quotes, criteria) {
+                // Remove duplicates based on text similarity
+                const uniqueQuotes = [];
+                const seenTexts = new Set();
+                
+                quotes.forEach(quote => {
+                    const normalizedText = quote.text.toLowerCase().replace(/[^\w\s]/g, '');
+                    
+                    if (!seenTexts.has(normalizedText)) {
+                        seenTexts.add(normalizedText);
+                        
+                        // Filter by length criteria
+                        const wordCount = quote.wordCount || quote.text.split(' ').length;
+                        let matchesLength = false;
+                        
+                        switch (criteria.quoteLength) {
+                            case 'short':
+                                matchesLength = wordCount <= 10;
+                                break;
+                            case 'medium':
+                                matchesLength = wordCount <= 30;
+                                break;
+                            case 'long':
+                                matchesLength = wordCount <= 50;
+                                break;
+                            default:
+                                matchesLength = true;
+                        }
+                        
+                        if (matchesLength) {
+                            uniqueQuotes.push({
+                                ...quote,
+                                wordCount: wordCount
+                            });
+                        }
+                    }
+                });
+                
+                // Sort by relevance (you could implement a scoring system here)
+                return uniqueQuotes.sort((a, b) => {
+                    // Prefer quotes that match the theme better
+                    const themeWords = criteria.quoteTheme.toLowerCase().split(' ');
+                    const aScore = themeWords.reduce((score, word) => 
+                        a.text.toLowerCase().includes(word) ? score + 1 : score, 0);
+                    const bScore = themeWords.reduce((score, word) => 
+                        b.text.toLowerCase().includes(word) ? score + 1 : score, 0);
+                    
+                    return bScore - aScore;
                 });
             }
 
