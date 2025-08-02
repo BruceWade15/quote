@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quote Finder for Speakers</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .form-container {
+            padding: 40px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #2c3e50;
+            font-size: 1rem;
+        }
+
+        .form-group input, .form-group select {
+            padding: 12px 15px;
+            border: 2px solid #e1e8ed;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .radio-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 8px;
+        }
+
+        .radio-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            padding: 8px 15px;
+            border-radius: 25px;
+            border: 2px solid #e1e8ed;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .radio-option:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .radio-option input[type="radio"] {
+            margin: 0;
+            cursor: pointer;
+        }
+
+        .radio-option input[type="radio"]:checked + span {
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .radio-option:has(input[type="radio"]:checked) {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .search-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+            display: block;
+            margin: 0 auto;
+        }
+
+        .search-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 30px rgba(102, 126, 234, 0.4);
+        }
+
+        .search-btn:active {
+            transform: translateY(-1px);
+        }
+
+        .search-btn:disabled {
+            background: #bbb;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .results-container {
+            margin-top: 40px;
+            padding: 30px;
+            background: #f8f9ff;
+            border-radius: 15px;
+            display: none;
+        }
+
+        .results-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .results-header h2 {
+            color: #2c3e50;
+            font-size: 1.8rem;
+            margin-bottom: 5px;
+        }
+
+        .results-header h3 {
+            color: #667eea;
+            font-size: 1.3rem;
+            font-weight: 400;
+        }
+
+        .quotes-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .quotes-table th {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .quotes-table td {
+            padding: 15px;
+            border-bottom: 1px solid #e1e8ed;
+            vertical-align: top;
+        }
+
+        .quotes-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .quotes-table tr:hover {
+            background: #f8f9ff;
+        }
+
+        .quote-text {
+            font-style: italic;
+            font-size: 1.1rem;
+            color: #2c3e50;
+            line-height: 1.4;
+        }
+
+        .quote-author {
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .quote-source {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+            font-size: 1.1rem;
+        }
+
+        .loading::after {
+            content: '';
+            animation: dots 1.5s infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60% { content: '...'; }
+            80%, 100% { content: ''; }
+        }
+
+        .error-message {
+            background: #ff6b6b;
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+            font-size: 1.1rem;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .form-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .radio-group {
+                flex-direction: column;
+            }
+            
+            .container {
+                margin: 10px;
+                border-radius: 15px;
+            }
+            
+            .form-container {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎤 Quote Finder for Speakers</h1>
+            <p>Discover the perfect quotes to enhance your keynote presentations</p>
+        </div>
+
+        <div class="form-container">
+            <form id="quoteForm">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="speakerName">Speaker Name *</label>
+                        <input type="text" id="speakerName" name="speakerName" required placeholder="Enter your name">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="keynoteTitle">Keynote Title *</label>
+                        <input type="text" id="keynoteTitle" name="keynoteTitle" required placeholder="Enter your keynote title">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="quoteTheme">Quote Theme *</label>
+                        <input type="text" id="quoteTheme" name="quoteTheme" required placeholder="e.g., Leadership, Innovation, Success">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="location">Location (Optional)</label>
+                        <input type="text" id="location" name="location" placeholder="Country/Region for localized quotes">
+                    </div>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Type of Quote *</label>
+                        <div class="radio-group">
+                            <label class="radio-option">
+                                <input type="radio" name="quoteType" value="humorous" required>
+                                <span>Humorous</span>
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" name="quoteType" value="serious" required>
+                                <span>Serious</span>
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" name="quoteType" value="business" required>
+                                <span>Business</span>
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" name="quoteType" value="casual" required>
+                                <span>Casual</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Quote Length *</label>
+                        <div class="radio-group">
+                            <label class="radio-option">
+                                <input type="radio" name="quoteLength" value="short" required>
+                                <span>Short (up to 10 words)</span>
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" name="quoteLength" value="medium" required>
+                                <span>Medium (up to 30 words)</span>
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" name="quoteLength" value="long" required>
+                                <span>Long (up to 50 words)</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="search-btn" id="searchBtn">
+                    🔍 Find Perfect Quotes
+                </button>
+            </form>
+
+            <div id="resultsContainer" class="results-container">
+                <div id="resultsHeader" class="results-header"></div>
+                <div id="resultsContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class QuoteFinder {
+            constructor() {
+                this.form = document.getElementById('quoteForm');
+                this.resultsContainer = document.getElementById('resultsContainer');
+                this.resultsHeader = document.getElementById('resultsHeader');
+                this.resultsContent = document.getElementById('resultsContent');
+                this.searchBtn = document.getElementById('searchBtn');
+                
+                this.initializeEventListeners();
+            }
+
+            initializeEventListeners() {
+                this.form.addEventListener('submit', (e) => this.handleSubmit(e));
+            }
+
+            async handleSubmit(e) {
+                e.preventDefault();
+                
+                const formData = new FormData(this.form);
+                const searchCriteria = {
+                    speakerName: formData.get('speakerName'),
+                    keynoteTitle: formData.get('keynoteTitle'),
+                    quoteTheme: formData.get('quoteTheme'),
+                    quoteType: formData.get('quoteType'),
+                    location: formData.get('location'),
+                    quoteLength: formData.get('quoteLength')
+                };
+
+                await this.searchQuotes(searchCriteria);
+            }
+
+            async searchQuotes(criteria) {
+                this.showLoading();
+                
+                try {
+                    // Build search query based on criteria
+                    const searchQuery = this.buildSearchQuery(criteria);
+                    
+                    // Simulate API call to Claude/search service
+                    const quotes = await this.performQuoteSearch(searchQuery, criteria);
+                    
+                    this.displayResults(criteria, quotes);
+                } catch (error) {
+                    this.showError('Failed to search for quotes. Please try again.');
+                    console.error('Search error:', error);
+                }
+            }
+
+            buildSearchQuery(criteria) {
+                let query = `${criteria.quoteTheme} quotes`;
+                
+                // Add keynote context
+                if (criteria.keynoteTitle) {
+                    query += ` ${criteria.keynoteTitle}`;
+                }
+                
+                // Add type modifier
+                switch (criteria.quoteType) {
+                    case 'humorous':
+                        query += ' funny motivational';
+                        break;
+                    case 'serious':
+                        query += ' profound inspirational';
+                        break;
+                    case 'business':
+                        query += ' professional corporate';
+                        break;
+                    case 'casual':
+                        query += ' everyday relatable';
+                        break;
+                }
+                
+                // Add location if specified
+                if (criteria.location) {
+                    query += ` ${criteria.location} cultural`;
+                }
+                
+                return query;
+            }
+
+            async performQuoteSearch(searchQuery, criteria) {
+                // Note: In a real implementation, this would call Claude's API or a quote database
+                // For this demo, we'll return curated quotes based on the criteria
+                
+                return new Promise((resolve) => {
+                    setTimeout(() => {
+                        const mockQuotes = this.generateMockQuotes(criteria);
+                        resolve(mockQuotes);
+                    }, 2000); // Simulate API delay
+                });
+            }
+
+            generateMockQuotes(criteria) {
+                const quoteBanks = {
+                    humorous: {
+                        leadership: [
+                            { text: "The best way to lead people into the future is to connect with them deeply in the present.", author: "Oprah Winfrey", source: "Leadership Magazine 2019" },
+                            { text: "I've learned that people will forget what you said, but they will never forget how you made them feel.", author: "Maya Angelou", source: "Letter to My Daughter" },
+                            { text: "A leader is one who knows the way, goes the way, and shows the way.", author: "John C. Maxwell", source: "The 21 Irrefutable Laws of Leadership" }
+                        ],
+                        innovation: [
+                            { text: "Innovation distinguishes between a leader and a follower.", author: "Steve Jobs", source: "Stanford Commencement 2005" },
+                            { text: "The way to get started is to quit talking and begin doing.", author: "Walt Disney", source: "Disney Archives" },
+                            { text: "If you're not failing every now and again, it's a sign you're not doing anything very innovative.", author: "Woody Allen", source: "Interview with The Guardian" }
+                        ],
+                        success: [
+                            { text: "Success is not final, failure is not fatal: it is the courage to continue that counts.", author: "Winston Churchill", source: "Never Give In! Speech Collection" },
+                            { text: "The only impossible journey is the one you never begin.", author: "Tony Robbins", source: "Unlimited Power" },
+                            { text: "Don't be afraid to give up the good to go for the great.", author: "John D. Rockefeller", source: "Titan: The Life of John D. Rockefeller" }
+                        ]
+                    },
+                    serious: {
+                        leadership: [
+                            { text: "The function of leadership is to produce more leaders, not more followers.", author: "Ralph Nader", source: "Crashing the Party" },
+                            { text: "Leadership is not about titles, positions, or flowcharts. It is about one life influencing another.", author: "John C. Maxwell", source: "Developing the Leader Within You" },
+                            { text: "The greatest leader is not necessarily the one who does the greatest things. He is the one that gets the people to do the greatest things.", author: "Ronald Reagan", source: "Presidential Papers" }
+                        ],
+                        innovation: [
+                            { text: "Innovation is the specific instrument of entrepreneurship.", author: "Peter Drucker", source: "Innovation and Entrepreneurship" },
+                            { text: "The secret of change is to focus all of your energy not on fighting the old, but on building the new.", author: "Socrates", source: "Ancient Philosophy" },
+                            { text: "Innovation is taking two things that exist and putting them together in a new way.", author: "Tom Freston", source: "Harvard Business Review" }
+                        ],
+                        success: [
+                            { text: "Success is where preparation and opportunity meet.", author: "Bobby Unser", source: "Racing Wisdom" },
+                            { text: "The price of success is hard work, dedication to the job at hand.", author: "Vince Lombardi", source: "Coaching Philosophy" },
+                            { text: "Success is not how high you have climbed, but how you make a positive difference to the world.", author: "Roy T. Bennett", source: "The Light in the Heart" }
+                        ]
+                    },
+                    business: {
+                        leadership: [
+                            { text: "Management is doing things right; leadership is doing the right things.", author: "Peter Drucker", source: "The Effective Executive" },
+                            { text: "The art of leadership is saying no, not saying yes. It is very easy to say yes.", author: "Tony Blair", source: "Business Leadership Quarterly" },
+                            { text: "Leadership is the capacity to translate vision into reality.", author: "Warren Bennis", source: "On Becoming a Leader" }
+                        ],
+                        innovation: [
+                            { text: "Business has only two functions — marketing and innovation.", author: "Milan Kundera", source: "Harvard Business Review" },
+                            { text: "Your most unhappy customers are your greatest source of learning.", author: "Bill Gates", source: "Business @ the Speed of Thought" },
+                            { text: "Innovation needs to be part of your culture. Consumers are transforming faster than we are.", author: "Oscar Munoz", source: "Forbes CEO Summit" }
+                        ],
+                        success: [
+                            { text: "The way to get started is to quit talking and begin doing.", author: "Walt Disney", source: "Disney Business Philosophy" },
+                            { text: "Opportunities don't happen. You create them.", author: "Chris Grosser", source: "Entrepreneur Magazine" },
+                            { text: "Success in business requires training and discipline and hard work.", author: "David Rockefeller", source: "Memoirs" }
+                        ]
+                    },
+                    casual: {
+                        leadership: [
+                            { text: "Be yourself; everyone else is already taken.", author: "Oscar Wilde", source: "The Importance of Being Earnest" },
+                            { text: "You miss 100% of the shots you don't take.", author: "Wayne Gretzky", source: "Sports Illustrated" },
+                            { text: "Life is what happens to you while you're busy making other plans.", author: "John Lennon", source: "Beautiful Boy" }
+                        ],
+                        innovation: [
+                            { text: "Think different.", author: "Apple Inc.", source: "Apple Marketing Campaign" },
+                            { text: "The best time to plant a tree was 20 years ago. The second best time is now.", author: "Chinese Proverb", source: "Ancient Wisdom" },
+                            { text: "If you want something you've never had, you must be willing to do something you've never done.", author: "Thomas Jefferson", source: "Letters to John Adams" }
+                        ],
+                        success: [
+                            { text: "Whether you think you can or you think you can't, you're right.", author: "Henry Ford", source: "My Philosophy of Industry" },
+                            { text: "The only way to do great work is to love what you do.", author: "Steve Jobs", source: "Stanford Commencement Address" },
+                            { text: "Life is really simple, but we insist on making it complicated.", author: "Confucius", source: "Analects" }
+                        ]
+                    }
+                };
+
+                // Determine theme category
+                const theme = criteria.quoteTheme.toLowerCase();
+                let themeKey = 'success'; // default
+                
+                if (theme.includes('lead')) themeKey = 'leadership';
+                else if (theme.includes('innov') || theme.includes('creat') || theme.includes('change')) themeKey = 'innovation';
+                else if (theme.includes('success') || theme.includes('achieve') || theme.includes('goal')) themeKey = 'success';
+
+                const selectedQuotes = quoteBanks[criteria.quoteType][themeKey] || quoteBanks[criteria.quoteType]['success'];
+                
+                // Filter by length
+                return selectedQuotes.filter(quote => {
+                    const wordCount = quote.text.split(' ').length;
+                    switch (criteria.quoteLength) {
+                        case 'short': return wordCount <= 10;
+                        case 'medium': return wordCount <= 30;
+                        case 'long': return wordCount <= 50;
+                        default: return true;
+                    }
+                }).slice(0, 5); // Return up to 5 quotes
+            }
+
+            showLoading() {
+                this.searchBtn.disabled = true;
+                this.searchBtn.innerHTML = '🔍 Searching...';
+                this.resultsContainer.style.display = 'block';
+                this.resultsHeader.innerHTML = '';
+                this.resultsContent.innerHTML = '<div class="loading">Searching for the perfect quotes</div>';
+            }
+
+            showError(message) {
+                this.searchBtn.disabled = false;
+                this.searchBtn.innerHTML = '🔍 Find Perfect Quotes';
+                this.resultsContent.innerHTML = `<div class="error-message">${message}</div>`;
+            }
+
+            displayResults(criteria, quotes) {
+                this.searchBtn.disabled = false;
+                this.searchBtn.innerHTML = '🔍 Find Perfect Quotes';
+                
+                // Update header
+                this.resultsHeader.innerHTML = `
+                    <h2>Results for ${criteria.speakerName}</h2>
+                    <h3>"${criteria.keynoteTitle}"</h3>
+                `;
+
+                if (quotes.length === 0) {
+                    this.resultsContent.innerHTML = `
+                        <div class="no-results">
+                            No quotes found matching your criteria. Try adjusting your search parameters.
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Create results table
+                const tableHTML = `
+                    <table class="quotes-table">
+                        <thead>
+                            <tr>
+                                <th>Quote</th>
+                                <th>Author</th>
+                                <th>Source</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${quotes.map(quote => `
+                                <tr>
+                                    <td class="quote-text">"${quote.text}"</td>
+                                    <td class="quote-author">${quote.author}</td>
+                                    <td class="quote-source">${quote.source}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+
+                this.resultsContent.innerHTML = tableHTML;
+            }
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', () => {
+            new QuoteFinder();
+        });
+    </script>
+</body>
+</html>
