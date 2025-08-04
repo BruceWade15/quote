@@ -504,50 +504,84 @@
 
             buildSearchQueries(criteria) {
                 const queries = [];
-                const theme = criteria.quoteTheme.toLowerCase();
+                const theme = criteria.quoteTheme.toLowerCase().trim();
                 const type = criteria.quoteType;
-                const location = criteria.location;
+                const location = criteria.location ? criteria.location.trim() : '';
+                const keynoteTitle = criteria.keynoteTitle ? criteria.keynoteTitle.toLowerCase().trim() : '';
                 
-                // Primary search queries
-                queries.push(`${theme} quotes ${type}`);
-                queries.push(`famous ${theme} sayings`);
-                queries.push(`${theme} inspirational quotes`);
+                console.log('Building search queries with criteria:', criteria);
                 
-                // Add keynote-specific searches
-                if (criteria.keynoteTitle) {
-                    const keynoteWords = criteria.keynoteTitle.toLowerCase().split(' ').filter(word => word.length > 3);
+                // Primary search combining theme and type
+                queries.push(`"${theme}" quotes ${type}`);
+                queries.push(`${theme} ${type} quotes`);
+                
+                // Keynote title integration - this was missing proper implementation
+                if (keynoteTitle) {
+                    // Use full keynote title with theme
+                    queries.push(`"${keynoteTitle}" ${theme} quotes`);
+                    queries.push(`${keynoteTitle} ${theme} inspirational`);
+                    
+                    // Extract key concepts from keynote title
+                    const keynoteWords = keynoteTitle.split(' ').filter(word => 
+                        word.length > 3 && 
+                        !['the', 'and', 'for', 'with', 'from', 'into', 'that', 'this', 'your'].includes(word)
+                    );
+                    
                     keynoteWords.forEach(word => {
                         queries.push(`${word} ${theme} quotes`);
+                        queries.push(`${theme} ${word} sayings`);
                     });
+                    
+                    // Combine keynote concepts with type
+                    if (keynoteWords.length > 0) {
+                        queries.push(`${keynoteWords[0]} ${theme} ${type} quotes`);
+                    }
                 }
                 
-                // Location-specific searches
-                if (location) {
-                    queries.push(`${theme} quotes ${location}`);
-                    queries.push(`${location} ${theme} proverbs`);
-                }
-                
-                // Type-specific searches
+                // Enhanced type-specific searches that include theme
                 switch (type) {
                     case 'humorous':
                         queries.push(`funny ${theme} quotes`);
-                        queries.push(`witty ${theme} sayings`);
+                        queries.push(`humorous ${theme} sayings`);
+                        if (keynoteTitle) queries.push(`funny quotes about ${keynoteTitle}`);
                         break;
                     case 'serious':
                         queries.push(`profound ${theme} quotes`);
-                        queries.push(`deep ${theme} wisdom`);
+                        queries.push(`serious ${theme} wisdom`);
+                        if (keynoteTitle) queries.push(`profound quotes about ${keynoteTitle}`);
                         break;
                     case 'business':
+                        queries.push(`business ${theme} quotes`);
                         queries.push(`professional ${theme} quotes`);
-                        queries.push(`corporate ${theme} sayings`);
+                        if (keynoteTitle) queries.push(`business quotes about ${keynoteTitle}`);
                         break;
                     case 'casual':
                         queries.push(`everyday ${theme} quotes`);
                         queries.push(`simple ${theme} wisdom`);
+                        if (keynoteTitle) queries.push(`casual quotes about ${keynoteTitle}`);
                         break;
                 }
                 
-                return queries.slice(0, 5); // Limit to 5 searches to avoid rate limits
+                // Location-specific searches that properly integrate other criteria
+                if (location) {
+                    queries.push(`${theme} quotes from ${location}`);
+                    queries.push(`${location} ${theme} proverbs`);
+                    queries.push(`${location} sayings about ${theme}`);
+                    if (keynoteTitle) {
+                        queries.push(`${keynoteTitle} quotes ${location}`);
+                    }
+                }
+                
+                // Additional thematic searches
+                queries.push(`inspirational ${theme} quotes`);
+                queries.push(`famous sayings about ${theme}`);
+                queries.push(`best ${theme} quotes`);
+                
+                // Remove duplicates and limit
+                const uniqueQueries = [...new Set(queries)];
+                console.log('Generated search queries:', uniqueQueries.slice(0, 8));
+                
+                return uniqueQueries.slice(0, 8); // Increased to 8 for better coverage
             }
 
             async searchWeb(query, criteria) {
@@ -607,19 +641,44 @@
 
             async searchWithQuoteGarden(query, criteria) {
                 try {
-                    // Using QuoteGarden API (free quotes API)
-                    const apiUrl = `https://quotegarden.herokuapp.com/api/v3/quotes?author=${encodeURIComponent(query)}&limit=10`;
+                    console.log('Searching QuoteGarden with query:', query);
                     
-                    const response = await fetch(apiUrl);
-                    const data = await response.json();
+                    // Try multiple search approaches with QuoteGarden
+                    const searchMethods = [
+                        // Search by theme/keyword
+                        `https://quotegarden.herokuapp.com/api/v3/quotes?search=${encodeURIComponent(criteria.quoteTheme)}&limit=20`,
+                        // General quote search
+                        `https://quotegarden.herokuapp.com/api/v3/quotes?search=${encodeURIComponent(query)}&limit=15`,
+                    ];
                     
-                    if (data.statusCode === 200 && data.data) {
-                        return data.data.map(item => ({
-                            text: item.quoteText.replace(/["""]/g, ''),
-                            author: item.quoteAuthor,
-                            source: item.quoteGenre || 'QuoteGarden',
-                            wordCount: item.quoteText.split(' ').length
-                        }));
+                    for (const apiUrl of searchMethods) {
+                        try {
+                            const response = await fetch(apiUrl);
+                            const data = await response.json();
+                            
+                            console.log('QuoteGarden response:', data);
+                            
+                            if (data.statusCode === 200 && data.data && data.data.length > 0) {
+                                const quotes = data.data.map(item => ({
+                                    text: item.quoteText.replace(/["""]/g, '').trim(),
+                                    author: item.quoteAuthor || 'Unknown',
+                                    source: item.quoteGenre || 'QuoteGarden',
+                                    wordCount: item.quoteText.split(' ').length
+                                })).filter(quote => 
+                                    quote.text.length > 10 && 
+                                    quote.text.length < 500 &&
+                                    quote.author !== 'Unknown'
+                                );
+                                
+                                if (quotes.length > 0) {
+                                    console.log('Found quotes from QuoteGarden:', quotes.length);
+                                    return quotes;
+                                }
+                            }
+                        } catch (error) {
+                            console.warn('QuoteGarden method failed:', error);
+                            continue;
+                        }
                     }
                     
                     return [];
@@ -667,6 +726,9 @@
             }
 
             filterAndDeduplicateQuotes(quotes, criteria) {
+                console.log('Filtering quotes with criteria:', criteria);
+                console.log('Raw quotes found:', quotes.length);
+                
                 // Remove duplicates based on text similarity
                 const uniqueQuotes = [];
                 const seenTexts = new Set();
@@ -674,7 +736,7 @@
                 quotes.forEach(quote => {
                     const normalizedText = quote.text.toLowerCase().replace(/[^\w\s]/g, '');
                     
-                    if (!seenTexts.has(normalizedText)) {
+                    if (!seenTexts.has(normalizedText) && quote.text.length > 10) {
                         seenTexts.add(normalizedText);
                         
                         // Filter by length criteria
@@ -696,44 +758,247 @@
                         }
                         
                         if (matchesLength) {
+                            // Calculate relevance score based on all criteria
+                            const relevanceScore = this.calculateRelevanceScore(quote, criteria);
+                            
                             uniqueQuotes.push({
                                 ...quote,
-                                wordCount: wordCount
+                                wordCount: wordCount,
+                                relevanceScore: relevanceScore
                             });
                         }
                     }
                 });
                 
-                // Sort by relevance (you could implement a scoring system here)
-                return uniqueQuotes.sort((a, b) => {
-                    // Prefer quotes that match the theme better
-                    const themeWords = criteria.quoteTheme.toLowerCase().split(' ');
-                    const aScore = themeWords.reduce((score, word) => 
-                        a.text.toLowerCase().includes(word) ? score + 1 : score, 0);
-                    const bScore = themeWords.reduce((score, word) => 
-                        b.text.toLowerCase().includes(word) ? score + 1 : score, 0);
-                    
-                    return bScore - aScore;
+                // Sort by relevance score (highest first)
+                const sortedQuotes = uniqueQuotes.sort((a, b) => b.relevanceScore - a.relevanceScore);
+                
+                console.log('Filtered and sorted quotes:', sortedQuotes.length);
+                console.log('Top quotes scores:', sortedQuotes.slice(0, 5).map(q => ({ 
+                    text: q.text.substring(0, 50) + '...', 
+                    score: q.relevanceScore 
+                })));
+                
+                return sortedQuotes;
+            }
+
+            calculateRelevanceScore(quote, criteria) {
+                let score = 0;
+                const quoteText = quote.text.toLowerCase();
+                const theme = criteria.quoteTheme.toLowerCase();
+                const keynoteTitle = criteria.keynoteTitle ? criteria.keynoteTitle.toLowerCase() : '';
+                
+                // Theme relevance (highest weight)
+                const themeWords = theme.split(' ');
+                themeWords.forEach(word => {
+                    if (word.length > 2 && quoteText.includes(word)) {
+                        score += 10;
+                    }
                 });
+                
+                // Keynote title relevance
+                if (keynoteTitle) {
+                    const keynoteWords = keynoteTitle.split(' ').filter(word => word.length > 3);
+                    keynoteWords.forEach(word => {
+                        if (quoteText.includes(word)) {
+                            score += 8;
+                        }
+                    });
+                    
+                    // Bonus for full phrase matches
+                    if (quoteText.includes(keynoteTitle)) {
+                        score += 15;
+                    }
+                }
+                
+                // Type relevance
+                const typeKeywords = {
+                    'humorous': ['funny', 'humor', 'laugh', 'wit', 'joke', 'amusing'],
+                    'serious': ['serious', 'profound', 'deep', 'wisdom', 'truth', 'important'],
+                    'business': ['business', 'professional', 'work', 'success', 'corporate', 'career'],
+                    'casual': ['simple', 'everyday', 'life', 'easy', 'common', 'basic']
+                };
+                
+                const relevantKeywords = typeKeywords[criteria.quoteType] || [];
+                relevantKeywords.forEach(keyword => {
+                    if (quoteText.includes(keyword)) {
+                        score += 5;
+                    }
+                });
+                
+                // Length preference (slightly favor appropriate length)
+                const wordCount = quote.text.split(' ').length;
+                switch (criteria.quoteLength) {
+                    case 'short':
+                        if (wordCount <= 8) score += 3;
+                        break;
+                    case 'medium':
+                        if (wordCount >= 10 && wordCount <= 25) score += 3;
+                        break;
+                    case 'long':
+                        if (wordCount >= 25 && wordCount <= 45) score += 3;
+                        break;
+                }
+                
+                // Author credibility (simple check for known figures)
+                const famousAuthors = ['einstein', 'jobs', 'churchill', 'gandhi', 'mandela', 'disney', 'ford', 'roosevelt'];
+                const authorLower = quote.author.toLowerCase();
+                if (famousAuthors.some(name => authorLower.includes(name))) {
+                    score += 5;
+                }
+                
+                return score;
             }
 
             generateMockQuotes(criteria) {
+                console.log('Generating mock quotes for criteria:', criteria);
+                
                 const quoteBanks = {
                     humorous: {
                         leadership: [
                             { text: "The best way to lead people into the future is to connect with them deeply in the present.", author: "Oprah Winfrey", source: "Leadership Magazine 2019" },
                             { text: "I've learned that people will forget what you said, but they will never forget how you made them feel.", author: "Maya Angelou", source: "Letter to My Daughter" },
-                            { text: "A leader is one who knows the way, goes the way, and shows the way.", author: "John C. Maxwell", source: "The 21 Irrefutable Laws of Leadership" }
+                            { text: "A leader is one who knows the way, goes the way, and shows the way.", author: "John C. Maxwell", source: "The 21 Irrefutable Laws of Leadership" },
+                            { text: "The art of leadership is saying no, not saying yes.", author: "Tony Blair", source: "Political Memoirs" },
+                            { text: "Leadership is about making others better as a result of your presence.", author: "Sheryl Sandberg", source: "Lean In" }
                         ],
                         innovation: [
                             { text: "Innovation distinguishes between a leader and a follower.", author: "Steve Jobs", source: "Stanford Commencement 2005" },
                             { text: "The way to get started is to quit talking and begin doing.", author: "Walt Disney", source: "Disney Archives" },
-                            { text: "If you're not failing every now and again, it's a sign you're not doing anything very innovative.", author: "Woody Allen", source: "Interview with The Guardian" }
+                            { text: "If you're not failing every now and again, it's a sign you're not doing anything very innovative.", author: "Woody Allen", source: "Interview with The Guardian" },
+                            { text: "Innovation is taking two things that exist and putting them together in a new way.", author: "Tom Freston", source: "Harvard Business Review" },
+                            { text: "The secret of innovation is to see problems as opportunities.", author: "Richard Branson", source: "Screw It, Let's Do It" }
                         ],
                         success: [
                             { text: "Success is not final, failure is not fatal: it is the courage to continue that counts.", author: "Winston Churchill", source: "Never Give In! Speech Collection" },
                             { text: "The only impossible journey is the one you never begin.", author: "Tony Robbins", source: "Unlimited Power" },
-                            { text: "Don't be afraid to give up the good to go for the great.", author: "John D. Rockefeller", source: "Titan: The Life of John D. Rockefeller" }
+                            { text: "Don't be afraid to give up the good to go for the great.", author: "John D. Rockefeller", source: "Titan: The Life of John D. Rockefeller" },
+                            { text: "Success is where preparation and opportunity meet.", author: "Bobby Unser", source: "Racing Wisdom" },
+                            { text: "The way to get started is to quit talking and begin doing.", author: "Walt Disney", source: "Disney Business Philosophy" }
+                        ],
+                        motivation: [
+                            { text: "The future belongs to those who believe in the beauty of their dreams.", author: "Eleanor Roosevelt", source: "My Day" },
+                            { text: "It is during our darkest moments that we must focus to see the light.", author: "Aristotle", source: "Nicomachean Ethics" },
+                            { text: "Believe you can and you're halfway there.", author: "Theodore Roosevelt", source: "Presidential Papers" }
+                        ],
+                        teamwork: [
+                            { text: "Alone we can do so little; together we can do so much.", author: "Helen Keller", source: "The Story of My Life" },
+                            { text: "Teamwork makes the dream work.", author: "John C. Maxwell", source: "Teamwork 101" },
+                            { text: "Individual commitment to a group effort is what makes a team work.", author: "Vince Lombardi", source: "Coaching Philosophy" }
+                        ]
+                    },
+                    serious: {
+                        leadership: [
+                            { text: "The function of leadership is to produce more leaders, not more followers.", author: "Ralph Nader", source: "Crashing the Party" },
+                            { text: "Leadership is not about titles, positions, or flowcharts. It is about one life influencing another.", author: "John C. Maxwell", source: "Developing the Leader Within You" },
+                            { text: "The greatest leader is not necessarily the one who does the greatest things. He is the one that gets the people to do the greatest things.", author: "Ronald Reagan", source: "Presidential Papers" },
+                            { text: "Management is doing things right; leadership is doing the right things.", author: "Peter Drucker", source: "The Effective Executive" },
+                            { text: "Leadership is the capacity to translate vision into reality.", author: "Warren Bennis", source: "On Becoming a Leader" }
+                        ],
+                        innovation: [
+                            { text: "Innovation is the specific instrument of entrepreneurship.", author: "Peter Drucker", source: "Innovation and Entrepreneurship" },
+                            { text: "The secret of change is to focus all of your energy not on fighting the old, but on building the new.", author: "Socrates", source: "Ancient Philosophy" },
+                            { text: "Innovation is taking two things that exist and putting them together in a new way.", author: "Tom Freston", source: "Harvard Business Review" },
+                            { text: "The only way to discover the limits of the possible is to go beyond them into the impossible.", author: "Arthur C. Clarke", source: "Profiles of the Future" },
+                            { text: "Innovation requires the courage to challenge the status quo.", author: "Richard Branson", source: "Business Stripped Bare" }
+                        ],
+                        success: [
+                            { text: "Success is where preparation and opportunity meet.", author: "Bobby Unser", source: "Racing Wisdom" },
+                            { text: "The price of success is hard work, dedication to the job at hand.", author: "Vince Lombardi", source: "Coaching Philosophy" },
+                            { text: "Success is not how high you have climbed, but how you make a positive difference to the world.", author: "Roy T. Bennett", source: "The Light in the Heart" },
+                            { text: "Success in business requires training and discipline and hard work.", author: "David Rockefeller", source: "Memoirs" },
+                            { text: "The road to success is always under construction.", author: "Lily Tomlin", source: "Stand-up Comedy Special" }
+                        ]
+                    },
+                    business: {
+                        leadership: [
+                            { text: "Management is doing things right; leadership is doing the right things.", author: "Peter Drucker", source: "The Effective Executive" },
+                            { text: "The art of leadership is saying no, not saying yes. It is very easy to say yes.", author: "Tony Blair", source: "Business Leadership Quarterly" },
+                            { text: "Leadership is the capacity to translate vision into reality.", author: "Warren Bennis", source: "On Becoming a Leader" },
+                            { text: "A good leader takes a little more than his share of the blame, a little less than his share of the credit.", author: "Arnold H. Glasow", source: "Business Quarterly" },
+                            { text: "The best executive is the one who has sense enough to pick good men to do what he wants done.", author: "Theodore Roosevelt", source: "Leadership Principles" }
+                        ],
+                        innovation: [
+                            { text: "Business has only two functions — marketing and innovation.", author: "Milan Kundera", source: "Harvard Business Review" },
+                            { text: "Your most unhappy customers are your greatest source of learning.", author: "Bill Gates", source: "Business @ the Speed of Thought" },
+                            { text: "Innovation needs to be part of your culture. Consumers are transforming faster than we are.", author: "Oscar Munoz", source: "Forbes CEO Summit" },
+                            { text: "The way to get started is to quit talking and begin doing.", author: "Walt Disney", source: "Disney Business Philosophy" },
+                            { text: "Innovation distinguishes between a leader and a follower.", author: "Steve Jobs", source: "Apple Inc." }
+                        ],
+                        success: [
+                            { text: "The way to get started is to quit talking and begin doing.", author: "Walt Disney", source: "Disney Business Philosophy" },
+                            { text: "Opportunities don't happen. You create them.", author: "Chris Grosser", source: "Entrepreneur Magazine" },
+                            { text: "Success in business requires training and discipline and hard work.", author: "David Rockefeller", source: "Memoirs" },
+                            { text: "The secret of getting ahead is getting started.", author: "Mark Twain", source: "Business Wisdom" },
+                            { text: "Don't be afraid to give up the good to go for the great.", author: "John D. Rockefeller", source: "Business Philosophy" }
+                        ]
+                    },
+                    casual: {
+                        leadership: [
+                            { text: "Be yourself; everyone else is already taken.", author: "Oscar Wilde", source: "The Importance of Being Earnest" },
+                            { text: "You miss 100% of the shots you don't take.", author: "Wayne Gretzky", source: "Sports Illustrated" },
+                            { text: "Life is what happens to you while you're busy making other plans.", author: "John Lennon", source: "Beautiful Boy" },
+                            { text: "The best time to plant a tree was 20 years ago. The second best time is now.", author: "Chinese Proverb", source: "Ancient Wisdom" },
+                            { text: "Whether you think you can or you think you can't, you're right.", author: "Henry Ford", source: "My Philosophy of Industry" }
+                        ],
+                        innovation: [
+                            { text: "Think different.", author: "Apple Inc.", source: "Apple Marketing Campaign" },
+                            { text: "The best time to plant a tree was 20 years ago. The second best time is now.", author: "Chinese Proverb", source: "Ancient Wisdom" },
+                            { text: "If you want something you've never had, you must be willing to do something you've never done.", author: "Thomas Jefferson", source: "Letters to John Adams" },
+                            { text: "The only way to do great work is to love what you do.", author: "Steve Jobs", source: "Stanford Commencement Address" },
+                            { text: "Life is really simple, but we insist on making it complicated.", author: "Confucius", source: "Analects" }
+                        ],
+                        success: [
+                            { text: "Whether you think you can or you think you can't, you're right.", author: "Henry Ford", source: "My Philosophy of Industry" },
+                            { text: "The only way to do great work is to love what you do.", author: "Steve Jobs", source: "Stanford Commencement Address" },
+                            { text: "Life is really simple, but we insist on making it complicated.", author: "Confucius", source: "Analects" },
+                            { text: "You miss 100% of the shots you don't take.", author: "Wayne Gretzky", source: "Sports Illustrated" },
+                            { text: "Be yourself; everyone else is already taken.", author: "Oscar Wilde", source: "Literary Works" }
+                        ]
+                    }
+                };
+
+                // Determine theme category based on quote theme input
+                const theme = criteria.quoteTheme.toLowerCase();
+                let themeKey = 'success'; // default
+                
+                // Check for theme keywords in the input
+                if (theme.includes('lead') || theme.includes('manage')) themeKey = 'leadership';
+                else if (theme.includes('innov') || theme.includes('creat') || theme.includes('change') || theme.includes('new')) themeKey = 'innovation';
+                else if (theme.includes('success') || theme.includes('achieve') || theme.includes('goal') || theme.includes('win')) themeKey = 'success';
+                else if (theme.includes('motiv') || theme.includes('inspir') || theme.includes('encourage')) themeKey = 'motivation';
+                else if (theme.includes('team') || theme.includes('collabor') || theme.includes('group')) themeKey = 'teamwork';
+                
+                // Also check keynote title for additional theme clues
+                if (criteria.keynoteTitle) {
+                    const keynote = criteria.keynoteTitle.toLowerCase();
+                    if (keynote.includes('lead') || keynote.includes('manage')) themeKey = 'leadership';
+                    else if (keynote.includes('innov') || keynote.includes('creat') || keynote.includes('future')) themeKey = 'innovation';
+                    else if (keynote.includes('team') || keynote.includes('together')) themeKey = 'teamwork';
+                }
+
+                const selectedQuotes = quoteBanks[criteria.quoteType][themeKey] || quoteBanks[criteria.quoteType]['success'] || [];
+                
+                console.log(`Using theme: ${themeKey}, type: ${criteria.quoteType}, found ${selectedQuotes.length} quotes`);
+                
+                // Filter by length and calculate relevance
+                const filteredQuotes = selectedQuotes.filter(quote => {
+                    const wordCount = quote.text.split(' ').length;
+                    switch (criteria.quoteLength) {
+                        case 'short': return wordCount <= 10;
+                        case 'medium': return wordCount <= 30;
+                        case 'long': return wordCount <= 50;
+                        default: return true;
+                    }
+                }).map(quote => ({
+                    ...quote,
+                    wordCount: quote.text.split(' ').length,
+                    relevanceScore: this.calculateRelevanceScore(quote, criteria)
+                }));
+                
+                // Sort by relevance score
+                return filteredQuotes.sort((a, b) => b.relevanceScore - a.relevanceScore).slice(0, 5);
+            }Titan: The Life of John D. Rockefeller" }
                         ]
                     },
                     serious: {
